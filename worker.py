@@ -13,7 +13,7 @@ channel.queue_declare(queue='task_queue', durable=True)
 channel.queue_bind('task_queue', 'django_amqp_example', 'task_queue')
 
 def callback(msg):
-    print "Received request: ", msg.body
+    print "Received request:", msg.body
     content = json.loads(msg.body)['content']
     response = {
         'rot13': content.encode('rot13')
@@ -23,8 +23,7 @@ def callback(msg):
         body=json.dumps(response),
         exchange='django_amqp_example')
 
-    print "Sending response: " + json.dumps(response)
-
+    print "Sending response:", json.dumps(response)
     channel.basic_publish(
         response_msg,
         routing_key=msg.reply_to)

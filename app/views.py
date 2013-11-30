@@ -9,41 +9,39 @@ class RpcClient(object):
     def __init__(self):
         self.response = None
 
+        self.connection = Connection()
+        self.channel = Channel(self.connection)
+
+        (self.queue, _, _) = self.channel.queue_declare(exclusive=True)
+        self.channel.queue_bind(self.queue, exchange='django_amqp_example')
+
     def request(self, body):
-        connection = Connection()
-        channel = Channel(connection)
-        channel.exchange_declare(exchange='django_amqp_example', type='topic', auto_delete=False)
-        channel.queue_declare(queue='task_queue', durable=True)
-
-        (queue_name, _, _) = channel.queue_declare(exclusive=True)
-        channel.queue_bind(queue_name, exchange='django_amqp_example')
-
         message = Message(
             body=json.dumps(body),
-            reply_to=queue_name,
+            reply_to=self.queue,
             content_type='application/json')
         
-        channel.basic_publish(
+        self.channel.basic_publish(
             message,
             exchange='django_amqp_example',
             routing_key='task_queue')
 
-        print "Task submitted"
+        print "Task submitted:", json.dumps(body)
 
         def callback(msg):
             self.response = json.loads(msg.body)
 
-        channel.basic_consume(
+        self.channel.basic_consume(
             callback=callback,
-            queue=queue_name,
+            queue=self.queue,
             no_ack=True)
 
         while True:
-            connection.drain_events(timeout=60)
+            self.connection.drain_events(timeout=60)
             if self.response is not None: 
                 break
 
-        connection.close()
+        self.connection.close()
         return self.response
 
 def rpc(request):
